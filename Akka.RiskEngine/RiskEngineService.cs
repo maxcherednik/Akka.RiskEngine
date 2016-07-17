@@ -1,40 +1,50 @@
 ﻿using Akka.Actor;
 using System;
 using Akka.Shared;
+using log4net;
+using System.Reflection;
+using System.Threading;
 
 namespace Akka.RiskEngine
 {
     class RiskEngineService
     {
-        private static ActorSystem ActorSystem { get; set; }
+        private static readonly ILog log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType.FullName);
+
+        private ActorSystem _actorSystem;
 
         private IActorRef _widgetManager;
 
+        private readonly ManualResetEvent _asTerminatedEvent = new ManualResetEvent(false);
+
         public void Start()
         {
-            Console.WriteLine("Starting risk engine...");
+            log.Info("Starting risk engine...");
 
-            ActorSystem = ActorSystem.Create("riskengine");
+            _actorSystem = ActorSystem.Create("riskengine");
 
-            _widgetManager =ActorSystem.ActorOf(Props.Create(() => new WidgetManagerActor(4)), "widgetmanager");
+            _widgetManager = _actorSystem.ActorOf(Props.Create(() => new WidgetManagerActor(2)), "widgetmanager");
 
-            Console.WriteLine("Started!");
+            log.Info("Started!");
         }
 
         public void Stop()
         {
-            Console.WriteLine("Stopping...");
+            log.Info("Stopping...");
 
-            var stopTask = _widgetManager.GracefulStop(TimeSpan.FromSeconds(5));
+            var cluster = Cluster.Cluster.Get(_actorSystem);
+            cluster.RegisterOnMemberRemoved(() => MemberRemoved(_actorSystem));
+            cluster.Leave(cluster.SelfAddress);
 
-            if (stopTask.Result)
-            {
-                
-            }
+            _asTerminatedEvent.WaitOne();
 
-            ActorSystem.Terminate().Wait();
+            log.Info("Actor system terminated, exiting");
+        }
 
-            Console.WriteLine("Stopped!");
+        private async void MemberRemoved(ActorSystem actorSystem)
+        {
+            await actorSystem.Terminate();
+            _asTerminatedEvent.Set();
         }
     }
 }

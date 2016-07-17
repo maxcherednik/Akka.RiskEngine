@@ -43,7 +43,7 @@ namespace Akka.Shared
 
                     // here we need to create widgets
 
-                    for (var i = 0; i < 50000; i++)
+                    for (var i = 0; i < 20; i++)
                     {
                         _widgetHolderRouter.Tell(new WidgetHolderActor.CreateWidget(i));
                         _initRequests.Add(i);

@@ -2,6 +2,7 @@
 using Akka.Actor;
 using Akka.Distributed.Actors;
 using System;
+using System.Threading;
 
 namespace Akka.Distributed
 {
@@ -19,16 +20,22 @@ namespace Akka.Distributed
 
             var client = ClusterSystem.ActorOf(Props.Create(() => new WidgetManagerClientActor()), "widgetmanagerclient");
 
-            var rnd = new Random();
-            while (true)
-            {
-                Console.ReadKey();
-                var widgetId = rnd.Next(0, 49);
-                client.Tell(new WidgetManagerClientActor.Subscribe(widgetId));
-            }
-            
+
 
             Console.ReadKey();
+
+            client.Tell(new WidgetManagerClientActor.Subscribe(10));
+
+
+
+
+            Console.ReadKey();
+
+            var cluster = Cluster.Cluster.Get(ClusterSystem);
+            
+            cluster.Leave(cluster.SelfAddress);
+
+            Thread.Sleep(30000);
 
             ClusterSystem.Terminate().Wait();
 

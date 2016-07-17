@@ -2,41 +2,47 @@
 using System.Threading;
 using Akka.Actor;
 using Akka.Shared;
+using log4net;
+using System.Reflection;
 
 namespace Akka.WidgetHolder
 {
     class WdgetHolderService
     {
-        private static ActorSystem ActorSystem { get; set; }
+        private static readonly ILog log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType.FullName);
+
+        private ActorSystem _actorSystem;
 
         private IActorRef _widgetHolder;
 
+        private readonly ManualResetEvent _asTerminatedEvent = new ManualResetEvent(false);
+
         public void Start()
         {
-            ActorSystem = ActorSystem.Create("riskengine");
+            _actorSystem = ActorSystem.Create("riskengine");
 
-            _widgetHolder = ActorSystem.ActorOf(Props.Create(() => new WidgetHolderActor()), "widget");
+            _widgetHolder = _actorSystem.ActorOf(Props.Create(() => new WidgetHolderActor()), "widget");
 
-            Console.WriteLine("Started!");
+            log.Info("Started");
         }
 
         public void Stop()
         {
-            Console.WriteLine("Stopping...");
+            log.Info("Stopping...");
 
-            var stopTask =_widgetHolder.GracefulStop(TimeSpan.FromSeconds(5));
-
-            var stopped = stopTask.Result;
-            
-            var cluster = Cluster.Cluster.Get(ActorSystem);
-
+            var cluster = Cluster.Cluster.Get(_actorSystem);
+            cluster.RegisterOnMemberRemoved(() => MemberRemoved(_actorSystem));
             cluster.Leave(cluster.SelfAddress);
 
-            Thread.Sleep(30000);
+            _asTerminatedEvent.WaitOne();
 
-            ActorSystem.Terminate().Wait();
+            log.Info("Actor system terminated, exiting");
+        }
 
-            Console.WriteLine("Stopped!");
+        private async void MemberRemoved(ActorSystem actorSystem)
+        {
+            await actorSystem.Terminate();
+            _asTerminatedEvent.Set();
         }
     }
 }
