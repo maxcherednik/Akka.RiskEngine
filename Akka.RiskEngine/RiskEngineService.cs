@@ -23,7 +23,7 @@ namespace Akka.RiskEngine
 
             _actorSystem = ActorSystem.Create("riskengine");
 
-            _widgetManager = _actorSystem.ActorOf(Props.Create(() => new WidgetManagerActor(2)), "widgetmanager");
+            //_widgetManager = _actorSystem.ActorOf(Props.Create(() => new WidgetManagerActor(2)), "widgetmanager");
 
             log.Info("Started!");
         }

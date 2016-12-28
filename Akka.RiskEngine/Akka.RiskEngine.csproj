@@ -31,17 +31,21 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Akka, Version=1.1.1.27, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Akka.1.1.1\lib\net45\Akka.dll</HintPath>
+    <Reference Include="Akka, Version=1.1.2.29, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Akka.1.1.2\lib\net45\Akka.dll</HintPath>
+      <Private>True</Private>
     </Reference>
-    <Reference Include="Akka.Cluster, Version=1.1.1.27, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Akka.Cluster.1.1.1\lib\net45\Akka.Cluster.dll</HintPath>
+    <Reference Include="Akka.Cluster, Version=1.1.2.29, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Akka.Cluster.1.1.2\lib\net45\Akka.Cluster.dll</HintPath>
+      <Private>True</Private>
     </Reference>
-    <Reference Include="Akka.Remote, Version=1.1.1.27, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Akka.Remote.1.1.1\lib\net45\Akka.Remote.dll</HintPath>
+    <Reference Include="Akka.Logger.log4net, Version=1.1.1.6, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Akka.Logger.log4net.1.1.1\lib\net45\Akka.Logger.log4net.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Akka.Remote, Version=1.1.2.29, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Akka.Remote.1.1.2\lib\net45\Akka.Remote.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="Akka.Serialization.Wire">
       <HintPath>..\packages\Akka.Serialization.Wire.1.1.0.26-beta\lib\net45\Akka.Serialization.Wire.dll</HintPath>
@@ -54,9 +58,9 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\Google.ProtocolBuffers.2.4.1.555\lib\net40\Google.ProtocolBuffers.Serialization.dll</HintPath>
     </Reference>
-    <Reference Include="Helios, Version=2.1.2.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Helios.2.1.2\lib\net45\Helios.dll</HintPath>
+    <Reference Include="Helios, Version=2.1.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Helios.2.1.3\lib\net45\Helios.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="log4net">
       <HintPath>..\packages\log4net.2.0.5\lib\net45-full\log4net.dll</HintPath>
@@ -66,16 +70,17 @@
       <HintPath>..\packages\Newtonsoft.Json.9.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="System" />
-    <Reference Include="System.Collections.Immutable, Version=1.2.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\System.Collections.Immutable.1.2.0\lib\portable-net45+win8+wp8+wpa81\System.Collections.Immutable.dll</HintPath>
+    <Reference Include="System.Collections.Immutable, Version=1.2.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Collections.Immutable.1.3.0\lib\portable-net45+win8+wp8+wpa81\System.Collections.Immutable.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="Topshelf, Version=3.3.154.0, Culture=neutral, PublicKeyToken=b800c4cfcdeea87b, processorArchitecture=MSIL">
       <HintPath>..\packages\Topshelf.3.3.1\lib\net40-full\Topshelf.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Wire">
+    <Reference Include="Wire, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Wire.0.0.6\lib\Wire.dll</HintPath>
+      <Private>True</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -85,6 +90,9 @@
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
+    <None Include="log4net.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="packages.config" />
     <None Include="app.config">
       <SubType>Designer</SubType>

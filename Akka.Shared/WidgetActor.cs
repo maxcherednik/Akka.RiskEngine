@@ -13,8 +13,8 @@ namespace Akka.Shared
 
         protected override void PreStart()
         {
-            _positionKeper = Context.ActorOf<PositionKeeperActor>();
-            _positionKeper.Tell(new PositionKeeperActor.Subscribe(0));
+            //_positionKeper = Context.ActorOf<PositionKeeperActor>();
+            //_positionKeper.Tell(new PositionKeeperActor.Subscribe(0));
         }
 
         public WidgetActor(string s)

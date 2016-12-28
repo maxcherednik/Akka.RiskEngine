@@ -1,5 +1,7 @@
-﻿using Topshelf;
+﻿using log4net.Config;
+using Topshelf;
 
+[assembly: XmlConfigurator(ConfigFile = "log4net.config", Watch = true)]
 namespace Akka.RiskEngine
 {
     class MainClass
