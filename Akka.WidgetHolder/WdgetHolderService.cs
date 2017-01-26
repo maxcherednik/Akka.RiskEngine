@@ -4,6 +4,7 @@ using Akka.Actor;
 using Akka.Shared;
 using log4net;
 using System.Reflection;
+using Akka.Configuration;
 
 namespace Akka.WidgetHolder
 {
@@ -14,12 +15,15 @@ namespace Akka.WidgetHolder
         private ActorSystem _actorSystem;
 
         private IActorRef _widgetHolder;
+        private IActorRef _clusterListener;
 
         private readonly ManualResetEvent _asTerminatedEvent = new ManualResetEvent(false);
 
         public void Start()
         {
             _actorSystem = ActorSystem.Create("riskengine");
+
+            _clusterListener = _actorSystem.ActorOf(Props.Create(() => new ClusterEventsListenerActor()));
 
             _widgetHolder = _actorSystem.ActorOf(Props.Create(() => new WidgetHolderActor()), "widget");
 

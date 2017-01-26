@@ -33,7 +33,7 @@ namespace Akka.Distributed.Actors
 
         public class Subscribe
         {
-            public long WidgetId { get; private set; }
+            public long WidgetId { get; }
 
             public Subscribe(long widgetId)
             {

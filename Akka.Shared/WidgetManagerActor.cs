@@ -3,93 +3,133 @@ using System.Collections.Generic;
 using System.Linq;
 using Akka.Actor;
 using Akka.Event;
-using Akka.Routing;
 using Akka.Util.Internal;
 
 namespace Akka.Shared
 {
     public class WidgetManagerActor : ReceiveActor
     {
-        private readonly int _minNumberOfWidgetHolders;
+        private readonly ILoggingAdapter _logger = Context.GetLogger();
+
         private readonly Dictionary<long, IActorRef> _widgets = new Dictionary<long, IActorRef>();
-        private IActorRef _widgetHolderRouter;
-        private ILoggingAdapter _logger;
+
+        private readonly IActorRef _widgetHolder;
+        private readonly IWidgetConfigurationProvider _widgetConfigurationProvider;
+        private readonly TimeSpan _storageNotAvailalableRetryPeriod;
 
         private readonly HashSet<long> _initRequests = new HashSet<long>();
 
+        private ICancelable _creationCheckCancel;
 
         protected override void PreStart()
         {
-            _logger = Context.GetLogger();
-            _widgetHolderRouter = Context.ActorOf(Props.Empty.WithRouter(FromConfig.Instance), "widgetsRouter");
-
-            _widgetHolderRouter.Tell(new GetRoutees());
+            _logger.Info("Widget initialization");
+            Self.Tell(new Init());
         }
 
-        public WidgetManagerActor(int minNumberOfWidgetHolders)
+        protected override void PostStop()
         {
-            _minNumberOfWidgetHolders = minNumberOfWidgetHolders;
-            Initializing();
+            _creationCheckCancel?.Cancel();
+            base.PostStop();
         }
 
-        private void Initializing()
+        public WidgetManagerActor(IActorRef widgetHolder, IWidgetConfigurationProvider widgetConfigurationProvider, TimeSpan storageNotAvailalableRetryPeriod)
         {
-            Receive<Routees>(routees =>
+            _widgetHolder = widgetHolder;
+            _widgetConfigurationProvider = widgetConfigurationProvider;
+            _storageNotAvailalableRetryPeriod = storageNotAvailalableRetryPeriod;
+
+            ReadingWidgetConfigurations();
+        }
+
+        private void ReadingWidgetConfigurations()
+        {
+            Receive<Init>(init =>
             {
-                var routeesNumber = routees.Members.ToList().Count;
-                if (routeesNumber >= _minNumberOfWidgetHolders)
-                {
-                    _logger.Info("Widget holders are here: {0}. Let's create widgets", routeesNumber);
+                _logger.Info("Lets request widget configurations");
 
-                    // here we need to create widgets
-
-                    for (var i = 0; i < 20; i++)
-                    {
-                        _widgetHolderRouter.Tell(new WidgetHolderActor.CreateWidget(i));
-                        _initRequests.Add(i);
-                    }
-                }
-                else
-                {
-                    _logger.Info("Not enough widget holders. {0} out of {1} are ready. Let's wait for 3 seconds", routeesNumber, _minNumberOfWidgetHolders);
-
-                    // let's try in 3 seconds
-                    Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromSeconds(3), _widgetHolderRouter, new GetRoutees(), Self);
-                }
+                _widgetConfigurationProvider.GetAllAsync().PipeTo(Self);
             });
+
+            Receive<List<long>>(list =>
+            {
+                _logger.Info("Widget configurations are here. Widget count: {0}", list.Count);
+
+                list.ForEach(wid =>
+                {
+                    _initRequests.Add(wid);
+                });
+
+                _creationCheckCancel = Context.System.Scheduler.ScheduleTellRepeatedlyCancelable(TimeSpan.Zero, TimeSpan.FromSeconds(3), Self, new CheckInit(), Self);
+
+                Become(WidgetCreation);
+            });
+
+            Receive<Status.Failure>(failure =>
+            {
+                _logger.Warning("Widget configuration issue. We will retry in: {0}", _storageNotAvailalableRetryPeriod);
+
+                Context.System.Scheduler.ScheduleTellOnce(_storageNotAvailalableRetryPeriod, Self, new Init(), Self);
+            });
+
+            Receive<Subscribe>(subscribe =>
+            {
+                _logger.Info("Someone wants to subscribe for widget: {0} I am initialising here. Hold on...", subscribe.WidgetId);
+                Sender.Tell(new Initializing());
+            });
+        }
+
+        private void WidgetCreation()
+        {
+            _logger.Info("Lets wait for widget initialization");
 
             Receive<WidgetHolderActor.WidgetCreated>(created =>
             {
+                _logger.Info("Widget {0} created", created.WidgetId);
+
                 if (_initRequests.Contains(created.WidgetId))
                 {
                     _initRequests.Remove(created.WidgetId);
-                    _widgets.Add(created.WidgetId, created.WdgetActorRef);
-                    Context.Watch(created.WdgetActorRef);
-                }
-
-                if (_initRequests.Count == 0)
-                {
-                    Become(Ready);
-
-                    SetReceiveTimeout(null);
+                    _widgets[created.WidgetId] = created.WidgetActorRef;
+                    Context.Watch(created.WidgetActorRef);
                 }
             });
 
-            Receive<ReceiveTimeout>(timeout =>
+            Receive<CheckInit>(timeout =>
             {
-                Console.WriteLine("WidgetCreation timeout");
+                _logger.Info("Widget initialization check");
 
                 if (_initRequests.Count > 0)
                 {
                     // issue create command again
-                    _initRequests.ForEach(i => _widgetHolderRouter.Tell(new WidgetHolderActor.CreateWidget(i)));
+                    _initRequests.ForEach(i => _widgetHolder.Tell(new WidgetHolderActor.CreateWidget(i)));
+
+                    _logger.Info("Widget initialization check. Widgets left: {0} ", _initRequests.Count);
+                }
+                else
+                {
+                    if (_creationCheckCancel != null)
+                    {
+                        _creationCheckCancel.Cancel();
+                        _creationCheckCancel = null;
+                    }
+
+                    _logger.Info("All widgets initilized");
+                    Become(Ready);
                 }
             });
 
-            ReceiveAny(o =>
+            Receive<Terminated>(terminated =>
             {
-                Sender.Tell("Initializing. Try a bit a later...");
-                Console.WriteLine("Busy");
+                _logger.Warning("Widget died {0} during initialization. Not cool... Let's hadnle it once initialized", terminated);
+
+                Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromSeconds(5), Self, terminated, Self);
+            });
+
+            Receive<Subscribe>(subscribe =>
+            {
+                _logger.Info("Someone wants to subscribe for widget: {0} I am initialising here. Hold on...", subscribe.WidgetId);
+                Sender.Tell(new Initializing());
             });
         }
 
@@ -97,7 +137,7 @@ namespace Akka.Shared
         {
             Receive<Subscribe>(subscribe =>
             {
-                Console.WriteLine("Someone wants to subscribe " + subscribe.WidgetId);
+                _logger.Info("Someone wants to subscribe {0}", subscribe.WidgetId);
 
                 IActorRef widget;
                 if (_widgets.TryGetValue(subscribe.WidgetId, out widget))
@@ -106,30 +146,102 @@ namespace Akka.Shared
                 }
                 else
                 {
-                    
+                    Sender.Tell(new WidgetNotFound());
                 }
             });
 
             Receive<Terminated>(terminated =>
             {
-                Console.WriteLine("Widget died " + terminated);
+                _logger.Warning("Widget died {0}", terminated);
                 var widgetRefToBeRemovedPair = _widgets.FirstOrDefault(@ref => @ref.Value.Equals(terminated.ActorRef));
 
                 _widgets.Remove(widgetRefToBeRemovedPair.Key);
 
-                _widgetHolderRouter.Tell(new WidgetHolderActor.CreateWidget(widgetRefToBeRemovedPair.Key));
+                _initRequests.Add(widgetRefToBeRemovedPair.Key);
+                _widgetHolder.Tell(new WidgetHolderActor.CreateWidget(widgetRefToBeRemovedPair.Key));
 
+                if (_creationCheckCancel == null)
+                {
+                    _creationCheckCancel = Context.System.Scheduler.ScheduleTellRepeatedlyCancelable(TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3), Self, new CheckInit(), Self);
+                }
+            });
+
+            Receive<CheckInit>(timeout =>
+            {
+                _logger.Info("Widget recovery check");
+
+                if (_initRequests.Count > 0)
+                {
+                    // issue create command again
+                    _initRequests.ForEach(i => _widgetHolder.Tell(new WidgetHolderActor.CreateWidget(i)));
+
+                    _logger.Info("Widget recovery. Widgets left: {0} ", _initRequests.Count);
+                }
+                else
+                {
+                    if (_creationCheckCancel != null)
+                    {
+                        _creationCheckCancel.Cancel();
+                        _creationCheckCancel = null;
+                    }
+
+                    _logger.Info("All widgets recovered");
+                }
+            });
+
+            Receive<WidgetHolderActor.WidgetCreated>(created =>
+            {
+                _logger.Info("Widget {0} recovered", created.WidgetId);
+
+                if (_initRequests.Contains(created.WidgetId))
+                {
+                    _initRequests.Remove(created.WidgetId);
+                    _widgets[created.WidgetId] = created.WidgetActorRef;
+                    Context.Watch(created.WidgetActorRef);
+                }
+            });
+
+            Receive<Reinit>(reinit =>
+            {
+                _logger.Info("Seems like someone wants us to reinit all the widgets");
+                _widgets.ForEach(pair => Context.Stop(pair.Value));
             });
         }
 
         public class Subscribe
         {
-            public long WidgetId { get; private set; }
+            public long WidgetId { get; }
 
             public Subscribe(long widgetId)
             {
                 WidgetId = widgetId;
             }
+        }
+
+        public class WidgetNotFound
+        {
+
+        }
+
+
+        public class Initializing
+        {
+
+        }
+
+        public class Reinit
+        {
+
+        }
+
+        private class Init
+        {
+
+        }
+
+        private class CheckInit
+        {
+
         }
     }
 }

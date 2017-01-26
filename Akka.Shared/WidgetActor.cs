@@ -1,73 +1,53 @@
 ﻿using Akka.Actor;
-using System;
 using System.Collections.Generic;
+using Akka.Event;
 
 namespace Akka.Shared
 {
     public class WidgetActor : ReceiveActor
     {
-        private readonly Dictionary<IActorRef, ICancelable> _subscribers = new Dictionary<IActorRef, ICancelable>();
-        private IActorRef _positionKeper;
+        private readonly ILoggingAdapter _logger = Context.GetLogger();
 
-        private List<string> _list = new List<string>();
-
-        protected override void PreStart()
-        {
-            //_positionKeper = Context.ActorOf<PositionKeeperActor>();
-            //_positionKeper.Tell(new PositionKeeperActor.Subscribe(0));
-        }
+        private readonly HashSet<IActorRef> _subscribers = new HashSet<IActorRef>();
 
         public WidgetActor(string s)
         {
-            
-            Console.WriteLine("Created " + s);
+            _logger.Info("Created {0}", s);
 
             Receive<Subscribe>(subscribe =>
             {
-                Console.WriteLine("new subscriber here for " + s);
+                _logger.Info("New subscriber for widget {0}", s);
 
-                if (!_subscribers.ContainsKey(Sender))
+                if (!_subscribers.Contains(Sender))
                 {
-                    var cancel = Context.System.Scheduler.ScheduleTellRepeatedlyCancelable(TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5), Sender, "ping from " + s, Self);
-                    _subscribers.Add(Sender, cancel);
+                    _subscribers.Add(Sender);
 
                     Context.Watch(Sender);
                 }
                 else
                 {
-                    Console.WriteLine("Already subscribed " + s);
+                    _logger.Info("Already subscribed {0}", s);
                 }
             });
 
             Receive<Terminated>(terminated =>
             {
-                Console.WriteLine("Subscriber died");
+                _logger.Info("Subscriber died");
 
                 DeleteSubscriber(terminated.ActorRef);
             });
 
             Receive<Unsubscribe>(unsubscribe =>
             {
-                Console.WriteLine("Subscriber wants to stop");
+                _logger.Info("Subscriber wants to unsubscribe");
                 DeleteSubscriber(Sender);
-            });
-
-            Receive<string>(s1 =>
-            {
-                Console.WriteLine("Update from position keeper " + s1);
-                _list.Add(s1);
             });
         }
 
         private void DeleteSubscriber(IActorRef subscriber)
         {
-            ICancelable cancelable;
-            if (_subscribers.TryGetValue(subscriber, out cancelable))
-            {
-                cancelable.Cancel();
-                Context.Unwatch(subscriber);
-                _subscribers.Remove(subscriber);
-            }
+            Context.Unwatch(subscriber);
+            _subscribers.Remove(subscriber);
         }
 
         public class Subscribe

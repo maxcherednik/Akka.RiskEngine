@@ -1,9 +1,10 @@
-﻿using Akka.Actor;
-using System;
-using Akka.Shared;
+﻿using System;
+using Akka.Actor;
 using log4net;
 using System.Reflection;
 using System.Threading;
+using Akka.Routing;
+using Akka.Shared;
 
 namespace Akka.RiskEngine
 {
@@ -14,8 +15,12 @@ namespace Akka.RiskEngine
         private ActorSystem _actorSystem;
 
         private IActorRef _widgetManager;
+        private IActorRef _clusterListener;
+        private IActorRef _widgetHolder;
+        private IActorRef _clusterRebalanceListener;
 
         private readonly ManualResetEvent _asTerminatedEvent = new ManualResetEvent(false);
+
 
         public void Start()
         {
@@ -23,7 +28,15 @@ namespace Akka.RiskEngine
 
             _actorSystem = ActorSystem.Create("riskengine");
 
-            //_widgetManager = _actorSystem.ActorOf(Props.Create(() => new WidgetManagerActor(2)), "widgetmanager");
+            _clusterListener = _actorSystem.ActorOf<ClusterEventsListenerActor>("clusterListener");
+
+            _widgetHolder = _actorSystem.ActorOf(Props.Empty.WithRouter(FromConfig.Instance), "widgetsRouter");
+
+            IWidgetConfigurationProvider widgetConfigurationProvider = new FakeWidgetConfigurationProvider();
+
+            _widgetManager = _actorSystem.ActorOf(Props.Create(() => new WidgetManagerActor(_widgetHolder, widgetConfigurationProvider, TimeSpan.FromSeconds(5))), "widgetmanager");
+
+            _clusterRebalanceListener = _actorSystem.ActorOf(Props.Create(() => new ClusterEventsListenerRebalanceActor(_widgetManager)), "clusterRebalanceListener");
 
             log.Info("Started!");
         }
