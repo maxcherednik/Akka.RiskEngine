@@ -17,6 +17,6 @@ Few things covered in this example:
   
 How to run:
  1. Akka.RiskEngine node serves as a seed node configured to run on localhost:4053
- 2. Akka.WidgetHolder node serves as a widget container configured to run on localhost:4054(every new node sould use it's own static port)
+ 2. Akka.WidgetHolder node serves as a widget container configured to run on localhost:4054(every new node sould use its own static port)
 
   
